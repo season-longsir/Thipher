@@ -29,6 +29,23 @@ class Game:
 
         self.chal_bdries = set()
 
+    def nxtplayer_idx(self, idx):
+        return (idx + 1) % self.n
+
+    def preplayer_idx(self, idx):
+        return (idx - 1) % self.n
+
+    def show_public_state(self):
+        print('\n' + '=' * 40)
+        print('【公共信息】')
+        for p in self.players:
+            funcs = p.func_list()
+            if funcs:
+                func_str = ', '.join(f'{name}x{count}' for name, count in funcs.items())
+            else:
+                func_str = '无'
+            print(func_str)  # TODO
+
     def run(self):
         # TODO
         pass
