@@ -20,3 +20,12 @@ def draw_r(excl_bomb = False):
         return Card('func', choose)
     else:
         return Card('digit', random.randint(0, 9))
+
+def gnrate_init():
+    hand = []
+    for _ in range(constants.MIN_DIGITS_INITIAL):
+        hand.append(Card('digit', random.randint(0, 9)))
+    while len(hand) < constants.INITIAL_HAND_SIZE:
+        hand.append(draw_r(excl_bomb = True))
+    random.shuffle(hand)
+    return hand
