@@ -44,8 +44,26 @@ class Game:
                 func_str = ', '.join(f'{name}x{count}' for name, count in funcs.items())
             else:
                 func_str = '无'
-            print(func_str)  # TODO
+            print(f'{p.name}：手牌数 = {p.count()}, 跳过轮次 = {p.skipped}')
+
+        if self.bomb_active and self.bombholder_idx is not None:
+            holder = self.players[self.bombholder_idx]
+            print(f'炸弹持有者：{holder.name}, 传递次数：{self.bomb_passes}/{self.pass_limit}')
+        else:
+            print('场上无炸弹。')
+
+        print('=' * 40)
+
+    def show_hand(self, player: Player):
+        print(f'\n【{player.name}的手牌】')
+        hands = []
+        for i, card in enumerate(player.hand):
+            hands.append(f'[{i}]{card.name}')
+        print(' ' + ' '.join(hands))
 
     def run(self):
+        print(f'游戏开始！\n共有{self.n}位玩家，秘密数字已生成！')
+        self.show_public_state()
+        cur = self.players[self.curplayer_idx]
+        self.show_hand(cur)
         # TODO
-        pass
