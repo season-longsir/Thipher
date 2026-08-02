@@ -3,6 +3,7 @@
 
 import random
 import constants
+import sys
 from player import Player
 from deck import gnrate_init
 
@@ -60,6 +61,45 @@ class Game:
         for i, card in enumerate(player.hand):
             hands.append(f'[{i}]{card.name}')
         print(' ' + ' '.join(hands))
+    
+    def rev_comp(self, player:Player, guess):
+        if guess == self.secret:
+            print(f'【私人】{player.name}，你的出牌{guess}与目标数字相等！')
+        elif guess < self.secret:
+            print(f'【私人】{player.name}，你的出牌{guess}小于目标数字！')
+        else:
+            print(f'【私人】{player.name}，你的出牌{guess}大于目标数字！')
+
+    def check_game_over(self):
+        alive = [p for p in self.players if p.alive]
+        if len(alive) == 0:
+            print("所有玩家都失败了，游戏结束。")
+            sys.exit(0)
+        elif len(alive) == 1:
+            winner = alive[0]
+            print(f"🏆 游戏结束，胜利者是 {winner.name}！")
+            sys.exit(0)
+
+    def advce_turn(self):
+        self.check_game_over()
+
+        self.curplayer_idx = self.nxtplayer_idx(self.curplayer_idx)
+        if self.curplayer_idx == 0:
+            self.round_index += 1
+
+        self.check_game_over()
+
+    def play_turn(self):
+        cur = self.players[self.curplayer_idx]
+        print(f'\n=========={cur.name}的回合==========')
+
+        if cur.skipped > 0:
+            print(f'{cur.name}被禁止，跳过回合，剩余：{cur.skipped - 1}回合')
+            cur.skipped -= 1
+            self.advce_turn()
+            return
+
+        # TODO
 
     def run(self):
         print(f'游戏开始！\n共有{self.n}位玩家，秘密数字已生成！')
