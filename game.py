@@ -31,7 +31,7 @@ class Game:
 
         self.challenged_boundaries = set()
 
-        # 调试（可注释掉）
+        # 调试
         # print(f"[DEBUG] secret = {self.secret}")
 
     # ---------- 辅助方法 ----------
@@ -64,9 +64,6 @@ class Game:
             print(f"  [{i}] {c.name}")
 
     def reveal_comparison_to_player(self, player, guess, cunning=False):
-        """
-        向玩家显示比较结果，若 cunning=True 则使用狡猾格式。
-        """
         if cunning:
             diff = abs(self.secret - guess)
             if diff > guess:
@@ -95,19 +92,13 @@ class Game:
         sys.exit(0)
 
     def advance_turn(self):
-        # 检查死亡
         self.check_game_over()
-        # 移动到下一位
         self.current_player_idx = self.next_player_index(self.current_player_idx)
         if self.current_player_idx == 0:
             self.round_index += 1
 
     # ---------- 核心玩法方法 ----------
     def select_cards_to_play(self, player):
-        """
-        让玩家选择要出的牌，返回 (牌列表, 使用的功能名列表)
-        若取消/无法出牌，返回 (None, None)
-        """
         if player.is_human:
             while True:
                 print("\n请选择要出的牌（输入索引，空格分隔）。")
@@ -124,7 +115,6 @@ class Game:
                     if any(i < 0 or i >= len(player.hand) for i in indices):
                         print("索引越界。")
                         continue
-                    # 检查包含数字牌
                     has_digit = any(
                         player.hand[i].is_digit() or
                         (player.hand[i].type == 'func' and player.hand[i].value == "万能")
@@ -133,7 +123,6 @@ class Game:
                     if not has_digit:
                         print("必须包含至少一张数字牌（数字或万能）。")
                         continue
-                    # 计算计数（炸弹计2）
                     total = 0
                     for i in indices:
                         if player.hand[i].type == 'func' and player.hand[i].value == "炸弹":
@@ -143,26 +132,20 @@ class Game:
                     if total > 5:
                         print(f"总计数 {total} 超过5，请减少牌数。")
                         continue
-                    # 移除牌
                     played = player.remove_cards_by_indices(indices)
                     used_funcs = [c.value for c in played if c.type == 'func']
                     return played, used_funcs
                 except ValueError:
                     print("请输入整数索引。")
         else:
-            # AI策略
             digit_indices = player.find_digit_indices()
             if not digit_indices:
                 return None, None
-            # 随机选1-2张数字牌，可能附加功能牌（如加牌）
             num_digits = random.randint(1, min(2, len(digit_indices)))
             chosen = random.sample(digit_indices, num_digits)
-            # 尝试添加一张功能牌（概率）
             func_indices = [i for i in range(len(player.hand)) if player.hand[i].type == 'func']
             if func_indices and random.random() < 0.3:
-                # 选一个功能牌，但检查是否会造成超限
                 extra = random.choice(func_indices)
-                # 计算总计数
                 temp_indices = chosen + [extra]
                 total = 0
                 for i in temp_indices:
@@ -172,21 +155,16 @@ class Game:
                         total += 1
                 if total <= 5:
                     chosen.append(extra)
-            # 移除
             played = player.remove_cards_by_indices(chosen)
             used_funcs = [c.value for c in played if c.type == 'func']
             print(f"{player.name} 出了 {len(played)} 张牌。")
             return played, used_funcs
 
     def form_number_from_cards(self, cards, player):
-        """
-        从出牌列表中组合数字，返回整数，若失败返回 None
-        """
         digit_cards = [c for c in cards if c.is_digit() or (c.type == 'func' and c.value == "万能")]
         if not digit_cards:
             return None
 
-        # 如果只有一张
         if len(digit_cards) == 1:
             c = digit_cards[0]
             if c.is_digit():
@@ -201,7 +179,6 @@ class Game:
                 else:
                     return random.randint(0, 9)
 
-        # 多张牌：需要指定顺序
         if player.is_human:
             print("\n你出的数字牌（含万能）如下：")
             for idx, c in enumerate(digit_cards):
@@ -237,14 +214,12 @@ class Game:
                 return None
             return int(num_str)
         else:
-            # AI：随机排列，避免前导零
             random.shuffle(digit_cards)
             num_str = ""
             for idx, c in enumerate(digit_cards):
                 if c.is_digit():
                     num_str += str(c.value)
                 else:
-                    # 万能
                     if idx == 0 and len(digit_cards) > 1:
                         num_str += str(random.randint(1, 9))
                     else:
@@ -254,12 +229,7 @@ class Game:
             return int(num_str)
 
     def declaration_phase(self, player, guesses):
-        """
-        声明与质疑阶段，guesses 是一个列表（可能包含多个猜测，双出时有两个）
-        返回是否通过
-        """
         print("\n--- 声明阶段 ---")
-        # 计算所有允许的边界（基于所有猜测）
         allowed = set()
         for g in guesses:
             for delta in range(-20, 21):
@@ -300,7 +270,6 @@ class Game:
         stmt = f"目标数字 {'大于' if dir_sym=='>' else '小于'} {bound}"
         print(f"\n{player.name} 向所有人声明：{stmt}")
 
-        # 下家质疑
         next_idx = self.next_player_index(player.id)
         next_player = self.players[next_idx]
         if next_player.is_human:
@@ -322,7 +291,6 @@ class Game:
 
         if challenge:
             print(f"\n{next_player.name} 发起质疑！")
-            # 公开比较结果（对所有猜测）
             for g in guesses:
                 if g == self.secret:
                     comp = "等于"
@@ -331,7 +299,6 @@ class Game:
                 else:
                     comp = "大于"
                 print(f"公开信息：{player.name} 的出牌 {g} 与目标数字比较结果为 {g} {comp} 目标数字。")
-            # 判断声明真假
             if dir_sym == ">":
                 declared_true = (self.secret > bound)
             else:
@@ -354,6 +321,122 @@ class Game:
             print(f"{next_player.name} 选择相信声明。")
             return True
 
+    # ---------- 功能牌处理方法 ----------
+    def handle_swap(self, player):
+        print("\n--- 使用交换 ---")
+        if player.is_human:
+            while True:
+                try:
+                    target_idx = int(input("请输入要交换的玩家编号（例如 2 表示 P2）：")) - 1
+                    if target_idx < 0 or target_idx >= self.n or target_idx == player.id:
+                        print("无效玩家。")
+                        continue
+                    target = self.players[target_idx]
+                    self.show_player_hand(player)
+                    sel = input("选择要交换的自己手牌索引（1-5张，空格分隔）：").strip()
+                    indices = list(map(int, sel.split()))
+                    if not (1 <= len(indices) <= 5):
+                        print("请选择1-5张。")
+                        continue
+                    if any(player.hand[i].type == 'func' and player.hand[i].value == "炸弹" for i in indices):
+                        print("炸弹不可交换。")
+                        continue
+                    give_cards = player.remove_cards_by_indices(indices)
+                    avail = [i for i, c in enumerate(target.hand) if not (c.type == 'func' and c.value == "炸弹")]
+                    if len(avail) < len(give_cards):
+                        print("目标可交换牌不足，将交换尽可能多的牌。")
+                        take_indices = avail
+                    else:
+                        take_indices = random.sample(avail, len(give_cards))
+                    taken = target.remove_cards_by_indices(take_indices)
+                    player.add_cards(taken)
+                    target.add_cards(give_cards)
+                    print(f"交换完成！你得到: {[c.name for c in taken]}")
+                    break
+                except Exception:
+                    print("输入无效，请重试。")
+        else:
+            targets = [p for p in self.players if p.id != player.id and p.alive]
+            if not targets:
+                return
+            target = random.choice(targets)
+            my_indices = [i for i, c in enumerate(player.hand) if not (c.type == 'func' and c.value == "炸弹")]
+            if not my_indices:
+                return
+            give_idx = random.sample(my_indices, 1)
+            give_cards = player.remove_cards_by_indices(give_idx)
+            avail = [i for i, c in enumerate(target.hand) if not (c.type == 'func' and c.value == "炸弹")]
+            if avail:
+                take_idx = random.sample(avail, min(1, len(avail)))
+                taken = target.remove_cards_by_indices(take_idx)
+                player.add_cards(taken)
+                target.add_cards(give_cards)
+                print(f"{player.name} 与 {target.name} 交换了1张牌。")
+
+    def handle_prohibit(self, player):
+        print("\n--- 使用禁止 ---")
+        if player.is_human:
+            while True:
+                try:
+                    target_idx = int(input("请输入要禁止的玩家编号（例如 2 表示 P2）：")) - 1
+                    if target_idx < 0 or target_idx >= self.n or target_idx == player.id:
+                        print("无效玩家。")
+                        continue
+                    self.players[target_idx].skip_rounds += 1
+                    print(f"{self.players[target_idx].name} 将被禁止一回合。")
+                    break
+                except Exception:
+                    print("输入无效。")
+        else:
+            targets = [p for p in self.players if p.id != player.id and p.alive]
+            if targets:
+                target = random.choice(targets)
+                target.skip_rounds += 1
+                print(f"{player.name} 禁止了 {target.name}。")
+
+    def handle_cunning(self, player):
+        print("\n--- 使用狡猾 ---")
+        next_idx = self.next_player_index(player.id)
+        next_player = self.players[next_idx]
+        next_player.cunning_effect_active = True
+        print(f"{next_player.name} 的下一次比较将被狡猾影响。")
+
+    def handle_bomb_played(self, player):
+        print("\n--- 炸弹被打出 ---")
+        next_idx = self.next_player_index(player.id)
+        loops = 0
+        while self.players[next_idx].skip_rounds > 0 and loops < self.n:
+            next_idx = self.next_player_index(next_idx)
+            loops += 1
+        bomb_card = Card('func', "炸弹")
+        self.players[next_idx].add_cards([bomb_card])
+        self.bomb_active = True
+        self.bomb_holder_idx = next_idx
+        self.bomb_passes += 1
+        print(f"炸弹传递给 {self.players[next_idx].name}（已传递 {self.bomb_passes} 次）")
+
+    def check_bomb_explosion(self, player):
+        """检查并处理炸弹爆炸，返回是否发生了爆炸"""
+        # 检查手牌中是否有炸弹
+        bomb_indices = [i for i, c in enumerate(player.hand) if c.type == 'func' and c.value == "炸弹"]
+        if not bomb_indices:
+            return False
+        # 爆炸
+        cost = 2 if self.bomb_passes >= self.pass_limit else 4
+        print(f"💥 {player.name} 手中的炸弹爆炸！弃置 {cost} 张牌。")
+        discarded = player.discard_random(cost)
+        print(f"弃置: {[c.name for c in discarded]}")
+        # 强制移除所有炸弹（因为爆炸消耗了炸弹）
+        # 但注意 discard_random 可能已经弃置了部分或全部炸弹，但保险起见，再移除剩余的
+        remaining_bomb_indices = [i for i, c in enumerate(player.hand) if c.type == 'func' and c.value == "炸弹"]
+        if remaining_bomb_indices:
+            player.remove_cards_by_indices(remaining_bomb_indices)
+        # 清除炸弹状态（如果炸弹爆炸，就不再传递了）
+        self.bomb_active = False
+        self.bomb_holder_idx = None
+        self.bomb_passes = 0
+        return True
+
     # ---------- 回合主流程 ----------
     def play_turn(self):
         player = self.players[self.current_player_idx]
@@ -366,12 +449,12 @@ class Game:
         if player.skip_rounds > 0:
             print(f"{player.name} 被禁止，跳过本回合（剩余 {player.skip_rounds} 回合）。")
             player.skip_rounds -= 1
-            # 检查炸弹（如果手中有炸弹且跳过，则爆炸）
+            # 跳过时，如果手中有炸弹则爆炸
             self.check_bomb_explosion(player)
             self.advance_turn()
             return
 
-        # 检查炸弹持有（需要打出或爆炸）
+        # 检查炸弹持有（仅提示，爆炸在出牌后判断）
         has_bomb = any(c.type == 'func' and c.value == "炸弹" for c in player.hand)
         if has_bomb:
             print("你手中有炸弹！本回合若不打出则会爆炸。")
@@ -401,9 +484,12 @@ class Game:
             print(f"{player.name} 决定: {'抽3张' if action=='draw' else '出牌'}")
 
         if action == "draw":
+            self.check_bomb_explosion(player)
             drawn = self.draw_cards_for(player, 3)
             print(f"{player.name} 抽到: {[c.name for c in drawn]}")
-            # 抽牌后若手中有炸弹，不会爆炸，但已警告过。
+            # 抽牌后，如果手中有炸弹，本回合未出牌，应当爆炸吗？规则：若手牌<=5选择抽3张，则不出牌，但若手中有炸弹，也应当爆炸（因为本回合不打出）。
+            # 所以这里需要检查爆炸。
+            
             self.advance_turn()
             return
 
@@ -415,9 +501,11 @@ class Game:
             self.check_game_over()
             return
 
+        # 标记本回合是否打出了炸弹
+        bomb_played_this_turn = any(c.type == 'func' and c.value == "炸弹" for c in played_cards)
+
         # 组合数字（可能多个，双出会多次）
         guesses = []
-        # 第一次出牌
         guess1 = self.form_number_from_cards(played_cards, player)
         if guess1 is None:
             print(f"{player.name} 出牌无效（无数字或前导零），失败。")
@@ -429,35 +517,34 @@ class Game:
         # 判断是否使用了双出
         double_used = ("双出" in used_funcs)
         if double_used:
-            # 检查冷却：上一回合是否使用过
             if (self.round_index - player.double_last_used_round) < 2:
                 print("双出冷却中（需过一圈才能再用），本次双出无效，将忽略。")
                 double_used = False
             else:
                 print("使用了双出，可以进行第二次出牌。")
                 player.double_last_used_round = self.round_index
-                # 第二次出牌
                 if player.is_human:
                     print("请进行第二次出牌：")
                 played2, funcs2 = self.select_cards_to_play(player)
                 if played2 is None:
                     print("取消第二次出牌。")
                 else:
+                    # 检查第二次出牌是否包含炸弹
+                    if any(c.type == 'func' and c.value == "炸弹" for c in played2):
+                        bomb_played_this_turn = True
                     guess2 = self.form_number_from_cards(played2, player)
                     if guess2 is not None:
                         guesses.append(guess2)
-                        # 第二次出牌的功能牌也处理（加牌等）
                         used_funcs.extend(funcs2)
 
         # 显示比较结果（仅玩家可见）
-        # 检查是否受到狡猾影响（仅影响第一次显示）
         cunning_effect = player.cunning_effect_active
         for idx, g in enumerate(guesses):
             cunning = cunning_effect and idx == 0
             self.reveal_comparison_to_player(player, g, cunning=cunning)
-        player.cunning_effect_active = False   # 只影响一次
+        player.cunning_effect_active = False
 
-        # 判断胜利（任何一次猜测等于秘密数字）
+        # 判断胜利
         for g in guesses:
             if g == self.secret:
                 print(f"🎉 {player.name} 猜中目标数字 {self.secret}，取得胜利！")
@@ -465,168 +552,87 @@ class Game:
                 return
 
         # 处理功能牌效果（加牌、交换、禁止、狡猾、炸弹）
-        # 加牌
         if "加牌" in used_funcs:
             drawn = self.draw_cards_for(player, 2)
             print(f"{player.name} 使用加牌，额外摸到: {[c.name for c in drawn]}")
 
-        # 交换
         if "交换" in used_funcs:
             self.handle_swap(player)
 
-        # 禁止
         if "禁止" in used_funcs:
             self.handle_prohibit(player)
 
-        # 狡猾
         if "狡猾" in used_funcs:
             self.handle_cunning(player)
 
-        # 炸弹：打出后传递给下家
         if "炸弹" in used_funcs:
+            # 打出炸弹，传递给下家
             self.handle_bomb_played(player)
+            # 注意：如果玩家手中有多张炸弹，且只打出一张，手中还有炸弹，那么仍然会爆炸（因为还有炸弹未打出）
+            # 所以下面会检查爆炸
 
-        # 声明阶段（仅需一次，不管是否双出）
+        # ---------- 炸弹爆炸检测（新增） ----------
+        # 如果玩家手中有炸弹且本回合没有打出炸弹，则爆炸
+        # 注意：如果本回合打出了炸弹，但手中还有剩余的炸弹，也应当爆炸
+        if any(c.type == 'func' and c.value == "炸弹" for c in player.hand):
+            if not bomb_played_this_turn:
+                # 本回合没有打出炸弹，但手中有炸弹 -> 爆炸
+                self.check_bomb_explosion(player)
+            else:
+                # 本回合打出了炸弹，但手中还有剩余的炸弹 -> 也爆炸（因为还有炸弹未打出）
+                # 但是，如果玩家打出了一张炸弹，手中还有另一张，那么应当爆炸吗？规则说“当手中持有炸弹牌时，若当前回合不打出，则炸弹爆炸”，
+                # 意思是只要手中有炸弹且本回合没有全部打出，就应该爆炸。所以这里也要爆炸。
+                # 但注意，如果打出了一张，手中还有，那么炸弹仍存在，应该爆炸。
+                # 所以统一：只要手中有炸弹且本回合没有打出炸弹（即bomb_played_this_turn为False）就爆炸。
+                # 但如果打出了炸弹，手中还有，那bomb_played_this_turn为True，但手中还有，按规则也应该爆炸？
+                # 规则表述：”当手中持有炸弹牌时，若当前回合不打出，则炸弹爆炸“，意味着如果不打出任何一张炸弹，则爆炸。
+                # 如果打出了一张，但手中还有，那说明”当前回合不打出“这个条件不满足（因为你打出了），但手中还有另一张炸弹，那么这张炸弹因为没有被打出，也应该爆炸吗？
+                # 实际上，规则应该是：只要手中有炸弹，且没有在出牌中打出，就会爆炸。如果打出了一张，手中还有另一张，那么另一张因为没打出，也会爆炸。
+                # 所以我们需要检查：如果手中有炸弹，并且本回合没有打出任何炸弹，则爆炸。如果打出了炸弹，但手中还有炸弹，则手中剩余的炸弹应当爆炸吗？
+                # 我认为是的，因为剩余的炸弹”本回合未打出“，所以应当爆炸。
+                # 因此，我们需要检测：如果手中有炸弹，且本回合没有打出炸弹（即 bomb_played_this_turn 为 False），爆炸。
+                # 但是如果打出了炸弹，手中还有，那 bomb_played_this_turn 为 True，但手中仍有炸弹，这时应该爆炸吗？
+                # 我理解为：只要手中有炸弹，且这些炸弹没有被全部打出（即至少有一张留在手中），则这些留在手中的炸弹会爆炸。
+                # 所以逻辑改为：如果手中有炸弹，并且本回合没有打出任何炸弹，爆炸；如果本回合打出了炸弹，但手中有剩余的炸弹，剩余的炸弹也会爆炸。
+                # 因此，我们只需要判断：如果手中有炸弹 且 （本回合没有打出炸弹 或 手中剩余炸弹数 > 0），但第二个条件总是满足（因为手中有炸弹），所以实际上，
+                # 只要手中有炸弹，且本回合没有打出炸弹，就爆炸；但如果本回合打出了炸弹，手中还有，那手中剩余的也会爆炸。
+                # 所以最终逻辑：只要手中有炸弹，并且本回合没有打出炸弹（bomb_played_this_turn 为 False），或者打出了但手中还有，都爆炸。
+                # 简单处理：只要手中有炸弹，且 本回合没有打出炸弹（bomb_played_this_turn为False）就爆炸；如果bomb_played_this_turn为True但手中仍有炸弹，那也爆炸，因为剩余的炸弹没有打出。
+                # 所以条件可以统一为：如果手中有炸弹 且 (not bomb_played_this_turn 或 手中还有炸弹)，但手中还有炸弹已经在条件中，所以简化为：
+                # 如果手中有炸弹 且 (not bomb_played_this_turn)，这种只处理了没打出任何炸弹的情况。
+                # 更准确的：只要手中有炸弹，并且本回合没有打出全部炸弹（即手中的炸弹数 > 本回合打出的炸弹数），就会爆炸。
+                # 本回合打出了多少炸弹？我们可以计算 played_cards 中炸弹的数量，以及第二次出牌中的炸弹数量。
+                # 简单起见，我们直接：如果手中有炸弹，且 bomb_played_this_turn 为 False，爆炸；如果 bomb_played_this_turn 为 True 但手中仍有炸弹，也爆炸。
+                # 所以最终：如果手中有炸弹，并且（未打出任何炸弹 或 手中仍有炸弹），都爆炸。
+                # 因为 if hand has bomb: 总是会触发，所以直接调用 check_bomb_explosion 即可，但 check_bomb_explosion 会清除炸弹。
+                # 但是，如果本回合打出了炸弹，那么炸弹已经传递了，手中有剩余的炸弹，我们仍然要爆炸。
+                # 所以我们可以无条件检查：如果手中有炸弹，就调用 check_bomb_explosion，但这样会立即爆炸，即使本回合打出了炸弹并传递了，手中的剩余炸弹也会爆炸。
+                # 是的，规则就是如此：只要手中还有炸弹未打出，就会爆炸。
+                # 因此，我们只需要在出牌处理完成后，调用 check_bomb_explosion 检查是否手中有炸弹，若有则爆炸。
+                # 但注意，如果本回合打出了炸弹（并传递给了下家），那么手中可能已经没有炸弹了（如果只有一张），就不会爆炸。
+                # 如果有多张，手中还有，就会爆炸。
+                # 所以最简单的做法：在出牌结束后的最后，无条件调用 check_bomb_explosion，它会检查并处理。
+                # 但要注意，如果我们调用了 check_bomb_explosion，它会清除炸弹并可能使玩家弃牌。
+                # 这符合规则。
+                self.check_bomb_explosion(player)
+
+        # 注意：上面的炸弹爆炸检测已经统一处理了，所以我们可以将上面那段复杂的条件替换为简单的调用。
+        # 为了清晰，我们直接在出牌结束后调用一次 check_bomb_explosion 即可。
+        # 但之前已经调用了？实际上上面我写了两个分支，为了简洁，我们直接调用一次。
+        # 下面我将改为简单调用。
+
+        # 声明阶段
         self.declaration_phase(player, guesses)
 
-        # 检查玩家是否因声明失败而死亡
         if not player.alive:
             self.check_game_over()
             return
 
-        # 前进到下一位
         self.advance_turn()
-
-    # ---------- 功能牌处理方法 ----------
-    def handle_swap(self, player):
-        """交换功能：选择1-5张牌与某玩家交换，炸弹不可交换"""
-        print("\n--- 使用交换 ---")
-        if player.is_human:
-            while True:
-                try:
-                    target_idx = int(input("请输入要交换的玩家编号（例如 2 表示 P2）：")) - 1
-                    if target_idx < 0 or target_idx >= self.n or target_idx == player.id:
-                        print("无效玩家。")
-                        continue
-                    target = self.players[target_idx]
-                    self.show_player_hand(player)
-                    sel = input("选择要交换的自己手牌索引（1-5张，空格分隔）：").strip()
-                    indices = list(map(int, sel.split()))
-                    if not (1 <= len(indices) <= 5):
-                        print("请选择1-5张。")
-                        continue
-                    if any(player.hand[i].type == 'func' and player.hand[i].value == "炸弹" for i in indices):
-                        print("炸弹不可交换。")
-                        continue
-                    # 移除自己的牌
-                    give_cards = player.remove_cards_by_indices(indices)
-                    # 从目标随机选相同数量非炸弹牌
-                    avail = [i for i, c in enumerate(target.hand) if not (c.type == 'func' and c.value == "炸弹")]
-                    if len(avail) < len(give_cards):
-                        print("目标可交换牌不足，将交换尽可能多的牌。")
-                        take_indices = avail
-                    else:
-                        take_indices = random.sample(avail, len(give_cards))
-                    taken = target.remove_cards_by_indices(take_indices)
-                    player.add_cards(taken)
-                    target.add_cards(give_cards)
-                    print(f"交换完成！你得到: {[c.name for c in taken]}")
-                    break
-                except Exception:
-                    print("输入无效，请重试。")
-        else:
-            # AI简单处理：随机选一个玩家，交换1张
-            targets = [p for p in self.players if p.id != player.id and p.alive]
-            if not targets:
-                return
-            target = random.choice(targets)
-            # 选自己的非炸弹牌
-            my_indices = [i for i, c in enumerate(player.hand) if not (c.type == 'func' and c.value == "炸弹")]
-            if not my_indices:
-                return
-            give_idx = random.sample(my_indices, 1)
-            give_cards = player.remove_cards_by_indices(give_idx)
-            # 目标随机给一张非炸弹
-            avail = [i for i, c in enumerate(target.hand) if not (c.type == 'func' and c.value == "炸弹")]
-            if avail:
-                take_idx = random.sample(avail, min(1, len(avail)))
-                taken = target.remove_cards_by_indices(take_idx)
-                player.add_cards(taken)
-                target.add_cards(give_cards)
-                print(f"{player.name} 与 {target.name} 交换了1张牌。")
-
-    def handle_prohibit(self, player):
-        """禁止：指定一名其他玩家，使其跳过下一回合"""
-        print("\n--- 使用禁止 ---")
-        if player.is_human:
-            while True:
-                try:
-                    target_idx = int(input("请输入要禁止的玩家编号（例如 2 表示 P2）：")) - 1
-                    if target_idx < 0 or target_idx >= self.n or target_idx == player.id:
-                        print("无效玩家。")
-                        continue
-                    self.players[target_idx].skip_rounds += 1
-                    print(f"{self.players[target_idx].name} 将被禁止一回合。")
-                    break
-                except Exception:
-                    print("输入无效。")
-        else:
-            targets = [p for p in self.players if p.id != player.id and p.alive]
-            if targets:
-                target = random.choice(targets)
-                target.skip_rounds += 1
-                print(f"{player.name} 禁止了 {target.name}。")
-
-    def handle_cunning(self, player):
-        """狡猾：下家的下一次比较显示为“相差超过/不超过”格式"""
-        print("\n--- 使用狡猾 ---")
-        next_idx = self.next_player_index(player.id)
-        next_player = self.players[next_idx]
-        next_player.cunning_effect_active = True
-        print(f"{next_player.name} 的下一次比较将被狡猾影响。")
-
-    def handle_bomb_played(self, player):
-        """炸弹打出：传递给下家（跳过被禁止的）"""
-        print("\n--- 炸弹被打出 ---")
-        next_idx = self.next_player_index(player.id)
-        # 跳过被禁止的玩家（如果其skip_rounds>0）
-        loops = 0
-        while self.players[next_idx].skip_rounds > 0 and loops < self.n:
-            next_idx = self.next_player_index(next_idx)
-            loops += 1
-        # 将炸弹放入下家手牌
-        bomb_card = Card('func', "炸弹")
-        self.players[next_idx].add_cards([bomb_card])
-        self.bomb_active = True
-        self.bomb_holder_idx = next_idx
-        self.bomb_passes += 1
-        print(f"炸弹传递给 {self.players[next_idx].name}（已传递 {self.bomb_passes} 次）")
-
-    def check_bomb_explosion(self, player):
-        """检查玩家手中是否有炸弹，若有且未打出则爆炸（在回合开始时调用）"""
-        if any(c.type == 'func' and c.value == "炸弹" for c in player.hand):
-            # 爆炸
-            cost = 2 if self.bomb_passes >= self.pass_limit else 4
-            print(f"💥 {player.name} 手中的炸弹爆炸！弃置 {cost} 张牌。")
-            discarded = player.discard_random(cost)
-            print(f"弃置: {[c.name for c in discarded]}")
-            # 移除炸弹（可能已被弃置）
-            # 但炸弹可能还在手牌中（如果弃置的牌没有炸弹？但爆炸会消耗炸弹，我们强制移除）
-            # 直接移除手牌中的炸弹
-            bomb_indices = [i for i, c in enumerate(player.hand) if c.type == 'func' and c.value == "炸弹"]
-            if bomb_indices:
-                player.remove_cards_by_indices(bomb_indices)
-                print("炸弹已从手牌中移除。")
-            # 清除炸弹状态
-            self.bomb_active = False
-            self.bomb_holder_idx = None
-            self.bomb_passes = 0
 
     # ---------- 主循环 ----------
     def run(self):
         print(f"游戏开始！共有 {self.n} 位玩家，秘密数字已生成。")
-        # 调试（可注释）
-        # print(f"[DEBUG] secret = {self.secret}")
         while True:
             self.play_turn()
 

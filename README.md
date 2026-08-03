@@ -11,8 +11,7 @@ Version 0.1
 
 Issue now (**TODO**):
 
-- The *Bomb Card* **CANNOT** explode.
 - The AI function **NEED** to improve.
 - **CANNOT** choose when discard.
 - The private message **NEED** to hide.
-- ...
+- When players lose, they'll act as usual.
