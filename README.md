@@ -9,10 +9,10 @@ Version 0.1
 
 ---
 
-Issue now (_TODO_):
+Issue now (**TODO**):
 
-- The *Bomb Card* _CANNOT_ explode.
-- The AI function _NEED_ to improve.
-- _CANNOT_ choose when discard.
-- The private message _NEED_ to hide.
+- The *Bomb Card* **CANNOT** explode.
+- The AI function **NEED** to improve.
+- **CANNOT** choose when discard.
+- The private message **NEED** to hide.
 - ...
