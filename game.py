@@ -6,6 +6,7 @@ import random
 import constants
 from player import Player
 from deck import draw_random_card, generate_initial_hand
+from card import Card
 
 class Game:
     def __init__(self, num_players, human_players):
