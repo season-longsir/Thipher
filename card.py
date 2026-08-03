@@ -1,51 +1,20 @@
-# To create object Card.
-
-
-from constants import FUNCTION_NAMES
-
+# card.py
+# 牌类定义
 
 class Card:
-    def __init__(self, card_type, value):
+    def __init__(self, card_type, value=None):
+        self.type = card_type   # 'digit' 或 'func'
+        self.value = value
         if card_type == 'digit':
-            if not isinstance(value, int) or not (0 <= value <= 9):
-                raise ValueError(f'The value of the digit card({value}) is illegal!')
-            self.type = 'digit'
-            self.value = value
             self.name = str(value)
-        elif card_type == 'func':
-            if value not in FUNCTION_NAMES:
-                raise ValueError(f'Unknown functiong card name: {value}!')
-            self.type = 'func'
-            self.value = value
-            self.name = value
         else:
-            raise ValueError(f'Unknown card type: {card_type}!')
+            self.name = value
 
     def is_digit(self):
         return self.type == 'digit'
 
-    def is_func(self):
-        return self.type == 'func'
+    def is_func(self, func_name):
+        return self.type == 'func' and self.value == func_name
 
     def __repr__(self):
-        if self.is_digit():
-            return f'Digit({self.value})'
-        else:
-            return f'Func({self.value})'
-
-    def __str__(self):
-        return self.name
-
-
-def mk_card(id):
-    if id in FUNCTION_NAMES:
-        return Card('func', id)
-    else:
-        try:
-            val = int(id)
-            if 0 <= val <= 9:
-                return Card('digit', val)
-            else:
-                raise ValueError(f'Unknown digit card mark: {val}')
-        except:
-            raise ValueError(f'Unknown card mark: {id}')
+        return f"Card({self.name})"
