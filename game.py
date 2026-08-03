@@ -92,9 +92,31 @@ class Game:
         sys.exit(0)
 
     def advance_turn(self):
+        # 先检查游戏是否结束
         self.check_game_over()
-        self.current_player_idx = self.next_player_index(self.current_player_idx)
-        if self.current_player_idx == 0:
+
+        start_idx = self.current_player_idx
+        crossed_zero = False
+
+        while True:
+            # 移动到下一位
+            self.current_player_idx = self.next_player_index(self.current_player_idx)
+
+            # 如果路过索引 0，标记已跨越零点（用于回合计数）
+            if self.current_player_idx == 0:
+                crossed_zero = True
+
+            # 如果绕了一圈回到起点，说明没有存活的玩家了
+            if self.current_player_idx == start_idx:
+                self.check_game_over()  # 再次检查，可能全部死亡
+                break
+
+            # 如果下一位玩家存活，则停止循环
+            if self.players[self.current_player_idx].alive:
+                break
+
+        # 如果跨越了零点，增加回合计数（用于双出冷却）
+        if crossed_zero:
             self.round_index += 1
 
     # ---------- 核心玩法方法 ----------
@@ -440,6 +462,11 @@ class Game:
     # ---------- 回合主流程 ----------
     def play_turn(self):
         player = self.players[self.current_player_idx]
+
+        # 如果当前玩家已经死亡，直接跳过
+        if not player.alive:
+            self.advance_turn()
+            return
         print(f"\n========== {player.name} 的回合 ==========")
         self.show_public_state()
         if player.is_human:

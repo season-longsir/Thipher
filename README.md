@@ -15,3 +15,5 @@ Issue now (**TODO**):
 - **CANNOT** choose when discard.
 - The private message **NEED** to hide.
 - When players lose, they'll act as usual.
+- - have skipped, but not complete.
+- When act two *Ban Card*, indeed they will act one.
