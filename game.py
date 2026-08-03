@@ -212,6 +212,108 @@ class Game:
                 num_str = '1' + num_str[1:]
             return int(num_str)
 
+    def declaration_phase(self, player, guess):
+        print(f"\n--- 声明阶段 ---")
+        allowed_boundaries = set()
+        for delta in range(-20, 21):
+            candidate = guess + delta
+            if candidate >= 0:   # 边界数字可为0，但规则未明确下限，设为>=0
+                allowed_boundaries.add(candidate)
+        # 移除已被质疑过的边界
+        allowed_boundaries = allowed_boundaries - self.challenged_boundaries
+
+        if not allowed_boundaries:
+            print(f"没有可声明的合法边界（所有可能边界都已被质疑过），{player.name} 自动失败。")
+            player.alive = False
+            self.check_game_over()
+            return False
+
+        # 获取声明
+        if player.is_human:
+            print("声明要求：边界数字必须与本回合出牌数字相差不超过20，且不能与曾被质疑过的边界重复。")
+            print(f"本回合出牌数字: {guess}")
+            print(f"可用边界示例: {sorted(list(allowed_boundaries))[:10]}... (共{len(allowed_boundaries)}个)")
+            while True:
+                dir_choice = input("请选择方向：1) 大于  2) 小于：").strip()
+                if dir_choice not in ("1", "2"):
+                    print("请输入1或2。")
+                    continue
+                dir_sym = ">" if dir_choice == "1" else "<"
+                bound_str = input("请输入边界数字（整数）：").strip()
+                if not bound_str.lstrip('-').isdigit():
+                    print("请输入有效整数。")
+                    continue
+                bound = int(bound_str)
+                if bound not in allowed_boundaries:
+                    print("边界数字不合法（请确保与出牌数字相差≤20且未被质疑过）。")
+                    continue
+                break
+        else:
+            bound = random.choice(list(allowed_boundaries))
+            dir_sym = random.choice([">", "<"])
+            print(f"{player.name} 声明: 目标数字 {'大于' if dir_sym=='>' else '小于'} {bound}")
+
+        stmt = f"目标数字 {'大于' if dir_sym=='>' else '小于'} {bound}"
+        print(f"\n{player.name} 向所有人声明：{stmt}")
+
+        next_idx = self.next_player_index(player.id)
+        next_player = self.players[next_idx]
+        if next_player.is_human:
+            while True:
+                ch = input(f"{next_player.name}，是否质疑？(y/n，默认n)：").strip().lower()
+                if ch in ("y", "yes"):
+                    challenge = True
+                    break
+                elif ch in ("n", "no", ""):
+                    challenge = False
+                    break
+                else:
+                    print("请输入 y 或 n。")
+        else:
+            prob = 0.25 + 0.02 * (next_player.count() - player.count())
+            prob = max(0.05, min(0.6, prob))
+            challenge = random.random() < prob
+            print(f"{next_player.name} 决定 {'质疑' if challenge else '相信'}（AI决策）。")
+
+        if challenge:
+            print(f"\n{next_player.name} 发起质疑！")
+            if guess == self.secret:
+                comp = "等于"
+            elif guess < self.secret:
+                comp = "小于"
+            else:
+                comp = "大于"
+            print(f"公开信息：{player.name} 出牌 {guess} 与目标数字比较结果为 {guess} {comp} 目标数字。")
+
+            # 判断声明真假
+            if dir_sym == ">":
+                declared_true = (self.secret > bound)
+            else:
+                declared_true = (self.secret < bound)
+
+            if declared_true:
+                # 声明为真：质疑者弃2张，声明者抽1张
+                print(f"声明为真！{next_player.name} 弃置2张牌，{player.name} 获得1张牌。")
+                lost = next_player.discard_random(2)
+                print(f"{next_player.name} 弃置: {[c.name for c in lost]}")
+                drawn = self.draw_cards_for(player, 1)
+                print(f"{player.name} 获得: {[c.name for c in drawn]}")
+            else:
+                # 声明为假：质疑者抽2张，声明者弃3张
+                print(f"声明为假！{next_player.name} 获得2张牌，{player.name} 弃置3张牌。")
+                drawn = self.draw_cards_for(next_player, 2)
+                print(f"{next_player.name} 获得: {[c.name for c in drawn]}")
+                lost = player.discard_random(3)
+                print(f"{player.name} 弃置: {[c.name for c in lost]}")
+
+            # 记录被质疑的边界（无论真假）
+            self.challenged_boundaries.add(bound)
+            return declared_true
+        else:
+            print(f"{next_player.name} 选择相信声明。")
+            # 相信则无事发生
+            return True
+
     def play_turn(self):
         cur = self.players[self.curplayer_idx]
         print(f'\n=========={cur.name}的回合==========')
@@ -279,7 +381,10 @@ class Game:
             drawn = self.draw_cards(cur, 2)
             print(f"{cur.name} 使用了 加牌，额外摸到: {[c.name for c in drawn]}")
 
-        # TODO: declare
+        self.declaration_phase(cur, guess)
+        if not cur.alive:
+            self.check_game_over()
+            return
 
         self.advce_turn()
 
@@ -289,3 +394,5 @@ class Game:
         cur = self.players[self.curplayer_idx]
         self.show_hand(cur)
         # TODO
+        while True:
+            self.play_turn()
