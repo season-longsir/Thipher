@@ -578,15 +578,14 @@ class Game:
                 self.game_over(winner=player)
                 return
 
-        # 处理功能牌效果（加牌、交换、禁止、狡猾、炸弹）
-        if "加牌" in used_funcs:
+        for _ in range(used_funcs.count("加牌")):
             drawn = self.draw_cards_for(player, 2)
             print(f"{player.name} 使用加牌，额外摸到: {[c.name for c in drawn]}")
 
-        if "交换" in used_funcs:
+        for _ in range(used_funcs.count("交换")):
             self.handle_swap(player)
 
-        if "禁止" in used_funcs:
+        for _ in range(used_funcs.count("禁止")):
             self.handle_prohibit(player)
 
         if "狡猾" in used_funcs:
