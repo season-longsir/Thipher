@@ -35,6 +35,17 @@ class Game:
         # print(f"[DEBUG] secret = {self.secret}")
 
     # ---------- 辅助方法 ----------
+
+    def discard_cards(self, player, n):
+        if n <= 0:
+            return []
+        discarded, full = player.discard_random(n)
+        if not full:
+            print(f"{player.name} 需要弃置 {n} 张牌，但手牌只有 {len(discarded)} 张，弃牌失败，玩家死亡！")
+            player.alive = False
+            self.check_game_over()
+        return discarded
+
     def next_player_index(self, idx):
         return (idx + 1) % self.n
 
@@ -327,7 +338,7 @@ class Game:
                 declared_true = (self.secret < bound)
             if declared_true:
                 print(f"声明为真！{next_player.name} 弃置2张牌，{player.name} 获得1张牌。")
-                lost = next_player.discard_random(2)
+                lost = self.discard_cards(next_player, 2)
                 print(f"{next_player.name} 弃置: {[c.name for c in lost]}")
                 drawn = self.draw_cards_for(player, 1)
                 print(f"{player.name} 获得: {[c.name for c in drawn]}")
@@ -335,7 +346,7 @@ class Game:
                 print(f"声明为假！{next_player.name} 获得2张牌，{player.name} 弃置3张牌。")
                 drawn = self.draw_cards_for(next_player, 2)
                 print(f"{next_player.name} 获得: {[c.name for c in drawn]}")
-                lost = player.discard_random(3)
+                lost = self.discard_cards(player, 3)
                 print(f"{player.name} 弃置: {[c.name for c in lost]}")
             self.challenged_boundaries.add(bound)
             return declared_true
@@ -446,7 +457,12 @@ class Game:
         # 爆炸
         cost = 2 if self.bomb_passes >= self.pass_limit else 4
         print(f"💥 {player.name} 手中的炸弹爆炸！弃置 {cost} 张牌。")
-        discarded = player.discard_random(cost)
+        discarded = self.discard_cards(player, cost)
+        if not player.alive:
+            self.bomb_active = False
+            self.bomb_holder_idx = None
+            self.bomb_passes = 0
+            return True
         print(f"弃置: {[c.name for c in discarded]}")
         # 强制移除所有炸弹（因为爆炸消耗了炸弹）
         # 但注意 discard_random 可能已经弃置了部分或全部炸弹，但保险起见，再移除剩余的
@@ -462,6 +478,13 @@ class Game:
     # ---------- 回合主流程 ----------
     def play_turn(self):
         player = self.players[self.current_player_idx]
+
+        if player.count_digits() == 0 and player.count() > 5:
+            print(f"{player.name} 没有可用的数字牌且手牌超过5张，无法出牌也无法抽牌，失败。")
+            player.alive = False
+            self.check_game_over()
+            self.advance_turn()
+            return
 
         # 如果当前玩家已经死亡，直接跳过
         if not player.alive:
@@ -604,48 +627,9 @@ class Game:
             if not bomb_played_this_turn:
                 # 本回合没有打出炸弹，但手中有炸弹 -> 爆炸
                 self.check_bomb_explosion(player)
-            else:
-                # 本回合打出了炸弹，但手中还有剩余的炸弹 -> 也爆炸（因为还有炸弹未打出）
-                # 但是，如果玩家打出了一张炸弹，手中还有另一张，那么应当爆炸吗？规则说“当手中持有炸弹牌时，若当前回合不打出，则炸弹爆炸”，
-                # 意思是只要手中有炸弹且本回合没有全部打出，就应该爆炸。所以这里也要爆炸。
-                # 但注意，如果打出了一张，手中还有，那么炸弹仍存在，应该爆炸。
-                # 所以统一：只要手中有炸弹且本回合没有打出炸弹（即bomb_played_this_turn为False）就爆炸。
-                # 但如果打出了炸弹，手中还有，那bomb_played_this_turn为True，但手中还有，按规则也应该爆炸？
-                # 规则表述：”当手中持有炸弹牌时，若当前回合不打出，则炸弹爆炸“，意味着如果不打出任何一张炸弹，则爆炸。
-                # 如果打出了一张，但手中还有，那说明”当前回合不打出“这个条件不满足（因为你打出了），但手中还有另一张炸弹，那么这张炸弹因为没有被打出，也应该爆炸吗？
-                # 实际上，规则应该是：只要手中有炸弹，且没有在出牌中打出，就会爆炸。如果打出了一张，手中还有另一张，那么另一张因为没打出，也会爆炸。
-                # 所以我们需要检查：如果手中有炸弹，并且本回合没有打出任何炸弹，则爆炸。如果打出了炸弹，但手中还有炸弹，则手中剩余的炸弹应当爆炸吗？
-                # 我认为是的，因为剩余的炸弹”本回合未打出“，所以应当爆炸。
-                # 因此，我们需要检测：如果手中有炸弹，且本回合没有打出炸弹（即 bomb_played_this_turn 为 False），爆炸。
-                # 但是如果打出了炸弹，手中还有，那 bomb_played_this_turn 为 True，但手中仍有炸弹，这时应该爆炸吗？
-                # 我理解为：只要手中有炸弹，且这些炸弹没有被全部打出（即至少有一张留在手中），则这些留在手中的炸弹会爆炸。
-                # 所以逻辑改为：如果手中有炸弹，并且本回合没有打出任何炸弹，爆炸；如果本回合打出了炸弹，但手中有剩余的炸弹，剩余的炸弹也会爆炸。
-                # 因此，我们只需要判断：如果手中有炸弹 且 （本回合没有打出炸弹 或 手中剩余炸弹数 > 0），但第二个条件总是满足（因为手中有炸弹），所以实际上，
-                # 只要手中有炸弹，且本回合没有打出炸弹，就爆炸；但如果本回合打出了炸弹，手中还有，那手中剩余的也会爆炸。
-                # 所以最终逻辑：只要手中有炸弹，并且本回合没有打出炸弹（bomb_played_this_turn 为 False），或者打出了但手中还有，都爆炸。
-                # 简单处理：只要手中有炸弹，且 本回合没有打出炸弹（bomb_played_this_turn为False）就爆炸；如果bomb_played_this_turn为True但手中仍有炸弹，那也爆炸，因为剩余的炸弹没有打出。
-                # 所以条件可以统一为：如果手中有炸弹 且 (not bomb_played_this_turn 或 手中还有炸弹)，但手中还有炸弹已经在条件中，所以简化为：
-                # 如果手中有炸弹 且 (not bomb_played_this_turn)，这种只处理了没打出任何炸弹的情况。
-                # 更准确的：只要手中有炸弹，并且本回合没有打出全部炸弹（即手中的炸弹数 > 本回合打出的炸弹数），就会爆炸。
-                # 本回合打出了多少炸弹？我们可以计算 played_cards 中炸弹的数量，以及第二次出牌中的炸弹数量。
-                # 简单起见，我们直接：如果手中有炸弹，且 bomb_played_this_turn 为 False，爆炸；如果 bomb_played_this_turn 为 True 但手中仍有炸弹，也爆炸。
-                # 所以最终：如果手中有炸弹，并且（未打出任何炸弹 或 手中仍有炸弹），都爆炸。
-                # 因为 if hand has bomb: 总是会触发，所以直接调用 check_bomb_explosion 即可，但 check_bomb_explosion 会清除炸弹。
-                # 但是，如果本回合打出了炸弹，那么炸弹已经传递了，手中有剩余的炸弹，我们仍然要爆炸。
-                # 所以我们可以无条件检查：如果手中有炸弹，就调用 check_bomb_explosion，但这样会立即爆炸，即使本回合打出了炸弹并传递了，手中的剩余炸弹也会爆炸。
-                # 是的，规则就是如此：只要手中还有炸弹未打出，就会爆炸。
-                # 因此，我们只需要在出牌处理完成后，调用 check_bomb_explosion 检查是否手中有炸弹，若有则爆炸。
-                # 但注意，如果本回合打出了炸弹（并传递给了下家），那么手中可能已经没有炸弹了（如果只有一张），就不会爆炸。
-                # 如果有多张，手中还有，就会爆炸。
-                # 所以最简单的做法：在出牌结束后的最后，无条件调用 check_bomb_explosion，它会检查并处理。
-                # 但要注意，如果我们调用了 check_bomb_explosion，它会清除炸弹并可能使玩家弃牌。
-                # 这符合规则。
-                self.check_bomb_explosion(player)
-
-        # 注意：上面的炸弹爆炸检测已经统一处理了，所以我们可以将上面那段复杂的条件替换为简单的调用。
-        # 为了清晰，我们直接在出牌结束后调用一次 check_bomb_explosion 即可。
-        # 但之前已经调用了？实际上上面我写了两个分支，为了简洁，我们直接调用一次。
-        # 下面我将改为简单调用。
+                if not player.alive:
+                    self.advance_turn()
+                    return
 
         # 声明阶段
         self.declaration_phase(player, guesses)

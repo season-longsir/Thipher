@@ -15,4 +15,4 @@ Issue now (**TODO**):
 - **CANNOT** choose when discard.
 - The private message **NEED** to hide.
 - When players lose, they'll act as usual.
-- - have skipped, but not complete.
+ - have skipped, but not complete.

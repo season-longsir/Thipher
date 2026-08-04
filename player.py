@@ -40,11 +40,12 @@ class Player:
         self.hand.extend(cards)
 
     def discard_random(self, n):
+        actual = min(n, len(self.hand))
         discarded = []
-        for _ in range(min(n, len(self.hand))):
+        for _ in range(actual):
             idx = random.randrange(len(self.hand))
             discarded.append(self.hand.pop(idx))
-        return discarded
+        return discarded, actual == n
 
     def find_func_indices(self, func_name):
         return [i for i, c in enumerate(self.hand) if c.type == 'func' and c.value == func_name]
